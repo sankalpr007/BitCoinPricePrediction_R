@@ -1,0 +1,284 @@
+---
+title: "An Exploratory Analysis of Bitcoin"
+author: "Error 404: Group Not Found"
+date: "April 7, 2019"
+output: html_document
+---
+
+
+#Introduction
+
+*Cryptocurrency is a digital currency designed to work as a medium of exchange that uses strong cryptography to secure financial transactions, control the creation of additional units, and verify the transfer of assets. Bitcoin is the first and currently the most widely used and known type of digital currency with a total value of $89.085 billion and over 17.6 million total Bitcoins in circulation. Major world currencies are prone to many challenges that affect their value and purchasing power. With Bitcoin, these challenges are less since no government or country controls the unit. Predicting the future price of Bitcoin, can help potential investors and miners identify the benefits or risks involved with trading, investing and mining bitcoins. To begin with our analysis, we first explore the trends and factors affecting the price of Bitcoin.*
+
+Loading the required libraries and dataset:
+```{r}
+require(tidyverse)
+require(lattice)
+require(dplyr)
+sample_btc <- read_csv("bitcoin_dataset.csv")
+```
+
+
+#Data
+
+*The data used  is  "Cryptocurrency Historical Prices by Sudalairajkumar", sourced from Kaggle consisting of 2920 rows of information pertaining to the various attributes of Bitcoin transactions collected daily from 2010 through 2018. Our dataset comprises of 24 variables out of which we will be focusing on a few important variables, namely:*
+
+*Date : Date of observation*
+
+*btc_market_price : Average USD market price across major Bitcoin exchanges.*
+
+*btc_total_bitcoins : The total number of Bitcoins that have already been mined.*
+
+*btc_market_cap : The total USD value of Bitcoin supply in circulation.*
+
+*btc_avg_block_size : The average block size in MB.*
+
+*btc_n_transactions : The number of daily confirmed Bitcoin transactions.*
+
+*btc_n_transactions_total : Total number of transactions.*
+
+*btc_cost_per_transaction : miners revenue divided by the number of transactions.*
+
+*btc_hash_rate : The estimated number of tera hashes per second the Bitcoin network is performing.*
+
+*btc_difficulty : A relative measure of how difficult it is to find a new block.*
+
+Sample Data:
+```{r}
+head(sample_btc)
+```
+
+
+#Data Cleaning:
+
+*By observing the imported data, we find a few N/A values i.e missing data.*
+
+```{r}
+summary(sample_btc)
+```
+
+*A few outliers are also present in the data.*
+
+```{r}
+bwplot(~btc_trade_volume | format(as.Date(Date, format="%Y/%m/%d"),"%Y"), data=sample_btc)
+```
+
+*Due to the effect of extreme outliers, median value has been chosen to replace the N/A values instead of the mean value.*
+```{r}
+sample_btc=sample_btc %>%mutate(btc_trade_volume=replace_na(btc_trade_volume, median(btc_trade_volume, na.rm = TRUE)))
+summary(sample_btc)
+#head(sample_btc)
+```
+
+*Also, since there are very few observations recorded in the dataset from the year 2010 to 2012, we shall be only considering data from 2012 through 2018 for our analysis.*
+
+```{r}
+xyplot(btc_n_transactions~Date, data=sample_btc)
+```
+
+Filtering the data from year 2012 onwards:
+```{r}
+sample_btc1 <- subset(sample_btc, format(as.Date(Date),"%Y")>=2012)
+head(sample_btc1)
+```
+
+
+
+#Descriptive Statistics:
+
+*On reviewing the data, we find that the least market price of Bitcoin is 4.33 on 02/19/2012 and highest market price is 19498.683 on 12/16/2017. The total number of Bitcoins that have been mined so far is 16876825 as of the last record of the dataset which is 02/20/2018. The highest total USD value of Bitcoin supply in circulation is 3.270e+11 and the average block size is 0.46067 MB. A summary of the key statistics of the data is given below:*
+
+```{r}
+summary(sample_btc1)
+head(sample_btc1)
+```
+
+*The average market price of Bitcoins and it's market capital per year shows that there was a major drop in the market price in the year 2015 which also affected the market capital in that particular year. Also, we can see that there was an extreme increase in the market price in the year 2017 as compared to 2016 i.e approximately an increase of 8 times the price.*
+
+```{r}
+sample_btc1 %>% group_by(format(as.Date(Date, format="%Y/%m/%d"),"%Y"))%>%summarise(Avg_MarketPrice=mean(btc_market_price), Avg_MarketCapital=mean(btc_market_cap))
+```
+
+
+
+#Exploratory Analysis:
+
+##How has the market price of bitcoin changed over the years?
+
+*The Market Price of Bitcoin is the average USD market price of Bitcoin across major Bitcoin exchanges or in simpler terms, the price/value of Bitcoin when sold in a given market. Below is a picturization of how the market value of Bitcoin has changed over the years.*
+
+```{r}
+xyplot(btc_market_price~Date, data=sample_btc1)
+```
+
+*The graph shows that the market price of Bitcoin has seen a gradual increase over time and hence indicates a rapid rise in the popularity of Bitcoin. This implies, Bitcoin is in high demand as of 2018.*
+
+##How does the limited supply of Bitcoins affect its value?
+
+*The total number of Bitcoins that have already been mined is 16,876,825 as per our data. By the stipulation set forth by the founders of Bitcoin, it has a limited and finite supply. In fact, there are only 21 million Bitcoins that can be mined in total. So, from our data, we're left with only 4.1 million Bitcoins or approximately 20% of the supply of Bitcoin that will ultimately be made available.*
+
+```{r}
+xyplot(btc_total_bitcoins~Date, data=sample_btc1)
+```
+
+*Bitcoin has already seen massive hikes in price in 2017 and 2018. While no one is entirely sure how Bitcoin will continue to spread to the larger financial world, it seems likely that a limited supply of the currency may cause prices to continue to increase.*
+
+*The imbalance of supply and demand translates to the high pricing of Bitcoin.*
+
+```{r}
+xyplot(btc_market_price~btc_total_bitcoins, data=sample_btc1)
+```
+
+##Is average block size and transaction confirmation related to each other? How?
+
+*Bitcoin works on a vast public ledger, also called a blockchain, where all confirmed transactions are included as so-called 'blocks.' As each block enters the system, it is broadcast to the peer-to-peer computer network of users for validation. In this way, all users are aware of each transaction, which prevents stealing and double-spending, where someone spends the same currency twice.*
+
+*Transactions, at its most basic level, are made up of data which is usually composed of the information regarding the transaction itself. This data, like any other, takes up space on the block it is included. Currently, each block on the Bitcoin blockchain is able to contain 1 MB of data, meaning that the block size of Bitcoin is 1 megabyte. This means that there is a limit to how many transactions can fit in Bitcoin's blocks.*
+
+*Consequently, Bitcoin is faced with a scalability problem. 1MB of data size holds an average of 2500 transactions. On average, Bitcoin processes four transactions per second. With more than 200,000 transactions a day, most Bitcoin transactions are delayed for an average of 30 minutes.*
+
+```{r}
+xyplot(btc_n_transactions~btc_n_transactions_total, data=sample_btc1)
+```
+
+##How do we speed up transactions?
+
+*Bitcoin transactions are not immediate. When a user wishes to send Bitcoins, information is broadcast from his/her wallet to the (users in the) network, who verify that he/she has enough coins, and that they have never been spent before. Once validated, miners will include this transaction - along with others - in a new block in the blockchain. This is called a transaction confirmation.* 
+
+*Percent of transactions confirmed as per year, is given by:*
+$$Per_TC = (btc_n_transactions/btc_n_transactions_total)/100$$
+
+*where:*
+
+*Per_TC = Percent transactions confirmed*
+
+*btc_n_transactions = Number of transactions confirmed*
+
+*btc_n_transactions_total = Total number of transactions performed*
+
+The percentage of transactions per day and from which we can get the average transactions confirmed per year:
+```{r}
+sample_btc1 %>% mutate(Per_TC=(btc_n_transactions/(btc_n_transactions_total-lag(btc_n_transactions_total,1))*100)) %>% group_by(format(as.Date(Date, format="%Y/%m/%d"),"%Y")) %>% summarise(Avg_Per_TC=mean(Per_TC))
+```
+
+*The above table shows that the percentage of transactions confirmed per year is decreasing every year*
+
+*Each time a new block is added to the chain (every ten minutes), the transaction is said to be confirmed again. Bigger block size would mean more transactions being confirmed at once, hence speeding up transaction time.*
+
+```{r}
+xyplot(btc_blocks_size~btc_n_transactions, data=sample_btc1)
+```
+
+##But will increasing block size profit the bitcoin market?
+
+*Bitcoins are acquired by a process called mining. The role of miners is to secure the network and to process every Bitcoin transaction. Miners achieve this by solving a computational problem which allows them to chain together blocks of transactions. For this service, miners are rewarded with newly-created Bitcoins and transaction fees* 
+
+*Bitcoin miners are paid per block they produce. They also get the transaction fees paid for all the transactions contained in the block. But with the block size increased, the miner's fees will go down. Small miners would likely stop mining in the process since they would receive less pay in fees. Large mining companies would take more control of the mining business, which is bad for the network*
+
+```{r}
+histogram(~btc_cost_per_transaction_percent, data=sample_btc1)
+```
+
+##Hash rate and Difficulty level
+
+*The mining process of Bitcoin is connected with the cost of investment in electricity and hardware. When it comes to the price, increase in price can lead the market participants to make an investment in hardware that leads to increased hash rate and in effect higher difficulty of finding a new block.*
+
+*A hash is the output of a hash function and, as it relates to Bitcoin, the Hash Rate is the speed at which a computer is completing an operation in the Bitcoin code*
+
+*Hash Rate and difficulty level of finding a new block of the blockchain have strong linear relation. When the Bitcoin network's difficulty increases, the hash rate increases and consequently, the miner earns 12.5 Bitcoin and the transaction fees.* 
+
+```{r}
+xyplot(btc_hash_rate~btc_difficulty, data=sample_btc1)
+```
+
+*If the miners are mining as an alternative to direct investment, they move to Bitcoin purchasers hence increasing the demand for Bitcoin and its price*
+
+
+#Results and Conclusion
+
+*In this report, we have analyzed the important predictors of Bitcoin price. Through our analysis we have found that the limited supply of Bitcoins has increased its demand, thereby projecting a possibility of higher future price of Bitcoins. On the contrary, increase in average block size could cause a negative impact on the Bitcoin network. Also, higher hash rates can lead to increased mining, thereby carrying the "blockchain" forward and ultimately favoring the Bitcoin market. With the help of these findings, we aim to predict the future price of Bitcoin through the Vector Autoregression prediction model.*
+
+
+
+#Predictive Analysis:
+
+
+```{r}
+library(MASS)
+library(tseries)
+library(forecast)
+```
+
+```{r}
+lnprice <- log(sample_btc1$btc_market_price[1:1800])
+lnprice
+```
+
+```{r}
+acf(lnprice, lag.max=365)
+pacf(lnprice, lag.max=365)
+difflnprice <- diff(lnprice,1)
+difflnprice
+adf.test(lnprice)
+adf.test(difflnprice)
+acf(difflnprice)
+pacf(difflnprice)
+```
+
+```{r}
+pricearima <- ts(lnprice, frequency = 365)
+class(pricearima)
+fitlnprice <- auto.arima(pricearima)
+fitlnprice
+plot(pricearima,type='l')
+title('Price Pred')
+exp(lnprice)
+summary(fitlnprice)
+```
+
+```{r}
+forecastedvalues <- forecast(fitlnprice, h=100)
+forecastedvalues
+plot(forecastedvalues)
+summary(forecastedvalues)
+```
+
+```{r}
+forecastedvaluesextracted <- as.numeric(forecastedvalues$mean)
+finalforecastedvalues <- exp(forecastedvaluesextracted)
+finalforecastedvalues
+```
+
+```{r}
+df <- data.frame(sample_btc1$btc_market_price[1801:1900],finalforecastedvalues)
+col_headings <- c("Actual Price","Forecasted Price")
+names(df) <- col_headings
+attach(df)
+df
+percentage_error <- ((df$'Actual Price'-df$'Forecasted Price')/(df$'Actual Price'))
+percentage_error
+#mean
+mean(percentage_error)
+```
+
+```{r}
+Box.test(fitlnprice$resid,lag=5,type="Ljung-Box")
+Box.test(fitlnprice$resid,lag=10,type="Ljung-Box")
+Box.test(fitlnprice$resid,lag=25,type="Ljung-Box")
+```
+
+```{r}
+View(df)
+```
+
+
+
+
+
+```{r}
+xyplot(btc_market_price~btc_market_cap+btc_total_bitcoins, data=sample_btc1)
+xyplot(btc_market_price~btc_hash_rate, data=sample_btc1)
+xyplot(btc_market_price~Date, data=sample_btc1)
+
+```
+

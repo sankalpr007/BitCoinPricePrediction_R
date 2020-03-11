@@ -1,0 +1,233 @@
+---
+title: 'Project 2 : Predictive Analysis'
+author: "Error 404:Group Not Found"
+date: "5/2/2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+# Introduction
+
+*Bitcoin is the most popular cryptocurrency, dominating the crypto space with its blockchain technology.It works on a peer to peer network, where no intermediaries are involved. It is the digital currency, which aims to exclude intervention of any third parties, while you are transacting. It is gaining popularity and many people have started using BTCs in real time.*
+
+*Bitcoin prices are surging at a greater pace.The ever-fluctuating Bitcoin price can be a cause of concern for current and potential users/investors of Bitcoin. Through this project we aim to predict the price of Bitcoin over a week using AutoRegressive Integrated Moving Average (ARIMA) Model.*
+
+# Model Building
+
+*The data used  is  "Cryptocurrency Historical Prices by Sudalairajkumar", sourced from Kaggle consisting of 2920 rows of information pertaining to the various attributes of Bitcoin transactions collected daily from 2010 through 2018. Our dataset comprises of 24 variables out of which we have chosen the btc_market_price as our dependent variable since we are predicting the future market price of Bitcoin.*
+
+## Installing and loading the required libraries
+
+```{r}
+#install.packages("rJava")
+install.packages("forecast")
+#install.packages("ggplot2")
+#install.packages("tseries")
+#install.packages("tidyverse")
+#install.packages("lattice")
+#install.packages("dplyr")
+require(rJava)
+require(ie2misc)
+library(forecast)
+library(ggplot2)
+library(tseries)
+library(tidyverse)
+library(lattice)
+library(dplyr)
+```
+
+## Loading the data
+
+```{r}
+my_data <- read_csv("bitcoin_dataset.csv")
+head(my_data)
+```
+as.Date('1/15/2001',format='%m/%d/%Y')
+
+*Due to the effect of extreme outliers in the original dataset, median values were chosen to replace the N/A values and also, since there are very few observations recorded in the dataset from the year 2010 to 2012, we have considered data from 2012 through 2018 for our predictive analysis.*
+
+```{r}
+my_data=my_data %>%mutate(btc_trade_volume=replace_na(btc_trade_volume, median(btc_trade_volume, na.rm = TRUE)))
+sample_bitcoins <- subset(my_data, format(as.Date(Date, format = '%m/%d/%Y'),"%Y")>=2012)
+head(sample_bitcoins)
+#head(my_data)
+```
+
+*Time series is a sequence of data that is recorded at regular intervals of time. Observing our data we find that it is time-dependent and recorded at regular intervals of time i.e daily which makes it a time series data and suitable for time series analysis to predict future values. We will be using the AutoRegressive Integrated Moving Average (ARIMA) Model to predict the price of Bitcoin over a week. *
+
+## A brief introduction to ARIMA
+
+*ARIMA stands for auto-regressive integrated moving average and is specified by three order parameters: (p, d, q).*
+
+*An auto regressive (AR(p)) component refers to the use of past values in the regression equation for a series Y. The auto-regressive parameter p specifies the number of lags used in the model. A lagged version of a time series means shifting the time base back by a given number of observations. For example, AR(2) or, equivalently, ARIMA(2,0,0), is represented as:*
+
+$$Y_t = c + \phi_1y_{t-1} + \phi_2 y_{t-2}+ e_t$$
+
+*where φ1, φ2 are parameters for the model.*
+
+*The d represents the degree of differencing in the integrated (I(d)) component. Differencing a series involves simply subtracting its current and previous values d times. Often, differencing is used to stabilize the series when the stationarity assumption is not met, which we will discuss below.*
+
+*A moving average (MA(q)) component represents the error of the model as a combination of previous error terms et. The order q determines the number of terms to include in the model.*
+
+$$Y_t = c + \theta_1 e_{t-1} + \theta_2 e_{t-2} +...+ \theta_q e_{t-q}+ e_t$$
+
+*Differencing, autoregressive, and moving average components make up a non-seasonal ARIMA model which can be written as a linear equation:*
+
+$$ Y_t = c + \phi_1y_d{_{t-1}} + \phi_p y_d{_{t-p}}+...+\theta_1 e_{t-1} +  \theta_q e_{t-q} + e_t$$
+
+*where yd is Y differenced d times and c is a constant.*
+
+## Decomposing the data
+
+*Many time series include trend, cycle and seasonality.These components capture the historical patterns in the series. Not every series will have all three (or any) of these components, but if they are present, deconstructing the series can helps us understand its behavior and prepare a foundation for building our forecasting model.*
+
+**Trend**
+*A trend exists when there is a long-term increase or decrease in the data. It does not have to be linear. Sometimes we will refer to a trend as “changing direction”, when it might go from an increasing trend to a decreasing trend.*
+
+**Seasonality**
+*A seasonal pattern occurs when a time series is affected by seasonal factors such as the time of the year or the day of the week. Seasonality is always of a fixed and known frequency.* 
+
+**Cyclicity**
+*A cycle occurs when the data exhibit rises and falls that are not of a fixed frequency. These fluctuations are usually due to economic conditions, and are often related to the “business cycle”.*
+
+*Finally, part of the series that can't be attributed to seasonal, cycle, or trend components is referred to as residual or error.*
+
+*The process of extracting these components is referred to as decomposition.*
+
+```{r}
+tsdata<-ts(sample_bitcoins$btc_market_price, frequency = 365)
+decomposed<-decompose(tsdata)
+plot(decomposed)
+```
+
+*We have used the ts() function to create a time series object to pass to the decompose() function in order to analyse the series.As for the frequency parameter in ts() object, we are specifying periodicity of the data, i.e., number of observations per period. Since we are using daily data of 6 years, we have 365 observations per year.*
+
+*From the graph above, we notice that the time series exhibits an increasing/positive trend as well as a seasonality component indicating that our series is non-stationary.* 
+
+## Stationarity
+
+*Fitting an ARIMA model requires the series to be stationary. A series is said to be stationary when its mean and variance are constant over time and there is no trend or seasonality component present. It is easier to predict when the series is stationary. Clearly, our data is non-stationary due to the presence of the trend and seasonality components.*
+
+```{r}
+plot(sample_bitcoins$btc_market_price[1:1801], type = 'l')
+```
+
+*The augmented Dickey-Fuller (ADF) test is a formal statistical test for stationarity. The null hypothesis assumes that the series is non-stationary. ADF procedure tests whether the change in Y can be explained by lagged value and a linear trend. If contribution of the lagged value to the change in Y is non-significant and there is a presence of a trend component, the series is non-stationary and null hypothesis will not be rejected.*
+
+*Our bitcoin data is non-stationary; the bitcoin market price changes through time, therefore, the ADF test does not reject the null hypothesis of non-stationarity, confirming that our data is non-stationary:*
+
+```{r}
+adf.test(sample_bitcoins$btc_market_price)
+```
+
+*A non-stationary series can be stationarized by performing log transformation and differencing on the series. Transformations such as logarithms can help to stabilise the variance of a time series. Differencing can help stabilise the mean of a time series by removing changes in the level of a time series, and therefore eliminating (or reducing) trend and seasonality. The difference is calculated by subtracting one period's values from the previous period's values.*
+
+```{r}
+bitcoins<-log(sample_bitcoins$btc_market_price[1:1801])
+diffbitcoins <- diff(bitcoins,1)
+diffbitcoins
+plot(diffbitcoins, type = 'l')
+```
+
+*Running the augmented Dickey-Fuller (ADF) test on differenced data rejects the null hypotheses of non-stationarity. Plotting the differenced series, we see no visible strong trend. This suggests that differencing of order 1 terms is sufficient and should be included in the model.*
+
+```{r}
+adf.test(diffbitcoins)
+```
+
+## Autocorrelations 
+
+*Autocorrelation plots (also known as ACF or the auto correlation function) are useful in determining whether a series is stationary. These plots can also help to choose the order parameters for ARIMA model.*
+
+*ACF plots display correlation between a series and its lags. In addition to suggesting the order of differencing, ACF plots can help in determining the order of the MA (q) model. Partial autocorrelation plots (PACF) display correlation of the residuals (which remains after removing the effects which are already explained by the earlier lag(S)) with the next lag value. PACF plots are useful when determining the order of the AR(p) model.*
+
+
+```{r}
+Acf(diffbitcoins)
+Pacf(diffbitcoins)
+```
+*Spikes at particular lags of the differenced series can help us choose the values of p or q for our model.*
+
+## Fitting the ARIMA model
+
+*The forecast package allows the user to explicitly specify the order of the model using the arima() function, or automatically generate a set of optimal (p, d, q) using auto.arima() function. This function searches through combinations of order parameters and picks the set that will produce the best fit for the model.*
+
+*There exists a number of such criteria for comparing quality of fit across multiple models. Two of the most widely used are Akaike information criteria (AIC) and Baysian information criteria (BIC). These criteria are closely related and can be interpreted as an estimate of how much information would be lost if a given model is chosen. When comparing models, one wants to minimize AIC and BIC.*
+
+```{r}
+tsdata1<-ts(bitcoins, frequency = 365)
+price<- auto.arima(tsdata1, trace = TRUE)
+price
+```
+*From the above output, the fitted model can be written as:*
+
+$$ \hat Y_{d_t} = 0.0459 Y_{t-1} + 0.7882 e_{t-1} + E$$
+*where E is some error and the original series is differenced with order 1.*
+
+## Forecasting
+
+*Forecast() is a generic function for forecasting from time series or time series models. We can specify forecast horizon h periods ahead for predictions to be made, and use the fitted model to generate those predictions. We have set the h value as 7 as we will be predicting the price of bitcoin a week ahead.*
+
+```{r}
+forecastedvalues <- forecast(price, h=7)
+forecastedvalues
+plot(forecastedvalues)
+summary(forecastedvalues)
+```
+
+*Trasforming the data back to its original "scale" for comparison of the predicted prices with the actual prices through the exp() function that computes antilogarithm:*
+
+```{r}
+forecastedvaluesextracted <- as.numeric(forecastedvalues$mean)
+finalforecastedvalues <- exp(forecastedvaluesextracted)
+```
+
+# Model Results
+
+*The table below shows a comparison of our predicted prices vs the actual price of bitcoin. We can see that there is a very nominal difference between the Actual Price of Bitcoin vs The Forecasted Price obtained through our ARIMA model which means our model is a good fit.*
+
+```{r}
+df <- data.frame(sample_bitcoins$btc_market_price[1801:1807],finalforecastedvalues)
+col_headings <- c("Actual Price","Forecasted Price")
+names(df) <- col_headings
+attach(df)
+df
+```
+
+## Accuracy
+
+*The mean absolute percentage error (MAPE), also known as mean absolute percentage deviation (MAPD), is a measure of prediction accuracy of a forecasting method.It measures this accuracy as a percentage, and can be calculated as the average absolute percent error for each time period minus actual values divided by actual values:* 
+
+*Calculating the MAPE manually:*
+
+```{r}
+percentage_error <- ((abs(df$'Actual Price'-df$'Forecasted Price')/(df$'Actual Price'))*100)
+percentage_error
+mean(percentage_error)
+```
+*R provides us with a function that can calculate the MAPE directly through the mape() function:*
+```{r}
+install.packages("stats")
+library(stats)
+#install.packages("MLmetrics")
+library(MLmetrics)
+error<-MAPE(`Forecasted Price`, `Actual Price`)
+error
+```
+
+*From the results obtained above, we observe an error percentage of 0.55 which is fairly good considering our model's fit.*
+
+*Another way to validate our model is by using The Ljung-Box Test. The Ljung-Box test tests the "overall" randomness based on a number of lags. For this reason, it is often referred to as a "portmanteau" test. We apply the Box-Ljung test to the residuals from the ARIMA(5,1,2) model fit to determine whether residuals are random. The Box-Ljung test shows that the first 150 lag autocorrelations among the residuals are greater than 0.05 (p-value = 0.139), indicating that the residuals are random and that the model provides an adequate fit to the data.*
+
+```{r}
+Box.test(price$residuals,lag=5,type="Ljung-Box")
+Box.test(price$residuals,lag=10,type="Ljung-Box")
+Box.test(price$residuals,lag=25,type="Ljung-Box")
+```
+
+# Conclusion
+
+*In this report, we have tried to predict the future price of Bitcoin through ARIMA modelling. We have observed that the ARIMA(5,1,2) is the best fit model for our predictive analysis. We find that there is a very nominal difference between the Actual Price of Bitcoin vs The Forecasted Price obtained through our ARIMA model with a mean percentage error of 0.55 which means our model is a good fit and our prediction has been successful.*
+
+*Other forecasting techniques, such as exponential smoothing, would help make the model more accurate using a weighted combinations of seasonality, trend, and historical values to make predictions. In addition, daily bitcoin price data is probably highly dependent on other factors, such market capital, hash rate, difficulty etc. We could try fitting time series models that allow for inclusion of other predictors using methods such ARMAX or dynamic regression.*
+
